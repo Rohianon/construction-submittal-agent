@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Construction Submittal Review Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .dropzone-active { border-color: #3b82f6; background-color: #eff6ff; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div x-data="reviewApp()" class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Construction Submittal Review Agent</h1>
+            <p class="text-gray-600">AI-powered review of shop drawings, product data, and material submittals</p>
+            <a href="/docs" class="text-blue-500 hover:underline text-sm">API Documentation</a>
+        </header>
+
+        <!-- Upload Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <!-- File Upload Zone -->
+            <div
+                class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer transition-colors"
+                :class="{ 'dropzone-active': isDragging }"
+                @dragover.prevent="isDragging = true"
+                @dragleave.prevent="isDragging = false"
+                @drop.prevent="handleDrop($event)"
+                @click="$refs.fileInput.click()"
+            >
+                <input
+                    type="file"
+                    x-ref="fileInput"
+                    @change="handleFileSelect($event)"
+                    accept=".pdf"
+                    class="hidden"
+                >
+                <div x-show="!file" class="text-gray-500">
+                    <svg class="mx-auto h-12 w-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <p class="text-lg font-medium">Drop your submittal PDF here or click to browse</p>
+                    <p class="text-sm mt-2">Supports shop drawings, product data, and material submittals</p>
+                </div>
+                <div x-show="file" class="text-green-600">
+                    <svg class="mx-auto h-12 w-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <p class="text-lg font-medium" x-text="file?.name"></p>
+                    <p class="text-sm mt-2" x-text="formatFileSize(file?.size)"></p>
+                </div>
+            </div>
+
+            <!-- Options -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Submittal Type</label>
+                    <select x-model="submittalType" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="product_data">Product Data</option>
+                        <option value="shop_drawing">Shop Drawing</option>
+                        <option value="material_sample">Material Sample</option>
+                        <option value="mix_design">Mix Design</option>
+                        <option value="certification">Certification</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" x-model="enableVision" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2">
+                        <span class="text-sm text-gray-700">Enable Vision Analysis (for drawings)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Additional Context -->
+            <div class="mt-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Additional Context (optional)</label>
+                <textarea
+                    x-model="additionalContext"
+                    rows="2"
+                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Any additional information about this submittal..."
+                ></textarea>
+            </div>
+
+            <!-- Submit Button -->
+            <button
+                @click="submitReview()"
+                :disabled="!file || loading"
+                class="w-full mt-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-md transition-colors flex items-center justify-center"
+            >
+                <template x-if="loading">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </template>
+                <span x-text="loading ? 'Analyzing Submittal...' : 'Review Submittal'"></span>
+            </button>
+        </div>
+
+        <!-- Error Message -->
+        <div x-show="error" x-cloak class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div class="flex">
+                <svg class="h-5 w-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p class="text-red-700" x-text="error"></p>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div x-show="result" x-cloak class="space-y-6">
+            <!-- Decision Banner -->
+            <div
+                class="rounded-lg p-6 text-white"
+                :class="getDecisionColor(result?.data?.decision)"
+            >
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold uppercase" x-text="formatDecision(result?.data?.decision)"></h2>
+                        <p class="mt-2 opacity-90" x-text="result?.data?.reasoning"></p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-3xl font-bold" x-text="Math.round((result?.data?.confidence_score || 0) * 100) + '%'"></div>
+                        <div class="text-sm opacity-75">Confidence</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compliance Checks -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                    </svg>
+                    Compliance Checks
+                </h3>
+                <div class="space-y-3">
+                    <template x-for="(check, category) in result?.data?.compliance_checks" :key="category">
+                        <div class="flex items-start p-3 bg-gray-50 rounded-md">
+                            <span x-html="getStatusIcon(check.status)" class="mr-3 mt-0.5"></span>
+                            <div class="flex-1">
+                                <div class="font-medium text-gray-800 capitalize" x-text="category"></div>
+                                <div class="text-sm text-gray-600" x-text="check.notes"></div>
+                            </div>
+                            <span
+                                class="px-2 py-1 text-xs font-medium rounded-full"
+                                :class="getStatusBadgeColor(check.status)"
+                                x-text="check.status.toUpperCase()"
+                            ></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Drawing Analysis (if available) -->
+            <div x-show="result?.data?.drawing_analysis?.images_analyzed > 0" class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    Drawing Analysis
+                    <span class="ml-2 text-sm font-normal text-gray-500" x-text="'(' + result?.data?.drawing_analysis?.images_analyzed + ' images)'"></span>
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div x-show="result?.data?.drawing_analysis?.dimensions_found?.length">
+                        <div class="text-sm font-medium text-gray-700 mb-2">Dimensions Found</div>
+                        <ul class="list-disc list-inside text-sm text-gray-600">
+                            <template x-for="dim in result?.data?.drawing_analysis?.dimensions_found" :key="dim">
+                                <li x-text="dim"></li>
+                            </template>
+                        </ul>
+                    </div>
+                    <div x-show="result?.data?.drawing_analysis?.materials_identified?.length">
+                        <div class="text-sm font-medium text-gray-700 mb-2">Materials Identified</div>
+                        <ul class="list-disc list-inside text-sm text-gray-600">
+                            <template x-for="mat in result?.data?.drawing_analysis?.materials_identified" :key="mat">
+                                <li x-text="mat"></li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
+                <div x-show="result?.data?.drawing_analysis?.potential_issues?.length" class="mt-4">
+                    <div class="text-sm font-medium text-red-700 mb-2">Potential Issues</div>
+                    <ul class="list-disc list-inside text-sm text-red-600">
+                        <template x-for="issue in result?.data?.drawing_analysis?.potential_issues" :key="issue">
+                            <li x-text="issue"></li>
+                        </template>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Required Actions -->
+            <div x-show="result?.data?.required_actions?.length" class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    Required Actions
+                </h3>
+                <ul class="space-y-2">
+                    <template x-for="(action, index) in result?.data?.required_actions" :key="index">
+                        <li class="flex items-start">
+                            <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-orange-100 text-orange-600 text-sm font-medium mr-3" x-text="index + 1"></span>
+                            <span class="text-gray-700" x-text="action"></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+
+            <!-- Citations -->
+            <div x-show="result?.data?.citations?.length" class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                    </svg>
+                    Citations
+                </h3>
+                <div class="space-y-4">
+                    <template x-for="citation in result?.data?.citations" :key="citation.source_num">
+                        <div class="border-l-4 border-blue-400 pl-4 py-2">
+                            <div class="font-medium text-gray-800">
+                                [<span x-text="citation.source_num"></span>] <span x-text="citation.file"></span>
+                                <span x-show="citation.section" class="text-gray-500" x-text="' - Section ' + citation.section"></span>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-1 italic" x-text="'\"' + (citation.quote || '').substring(0, 200) + '...\"'"></p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Processing Info -->
+            <div class="text-center text-sm text-gray-500">
+                Processed in <span x-text="Math.round(result?.processing_time_ms || 0)"></span>ms using <span x-text="result?.data?.llm_used"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function reviewApp() {
+            return {
+                file: null,
+                submittalType: 'product_data',
+                enableVision: true,
+                additionalContext: '',
+                loading: false,
+                error: null,
+                result: null,
+                isDragging: false,
+
+                handleFileSelect(event) {
+                    const file = event.target.files[0];
+                    if (file && file.type === 'application/pdf') {
+                        this.file = file;
+                        this.error = null;
+                    } else {
+                        this.error = 'Please select a PDF file';
+                    }
+                },
+
+                handleDrop(event) {
+                    this.isDragging = false;
+                    const file = event.dataTransfer.files[0];
+                    if (file && file.type === 'application/pdf') {
+                        this.file = file;
+                        this.error = null;
+                    } else {
+                        this.error = 'Please drop a PDF file';
+                    }
+                },
+
+                formatFileSize(bytes) {
+                    if (!bytes) return '';
+                    const mb = bytes / (1024 * 1024);
+                    return mb.toFixed(2) + ' MB';
+                },
+
+                async submitReview() {
+                    if (!this.file) return;
+
+                    this.loading = true;
+                    this.error = null;
+                    this.result = null;
+
+                    const formData = new FormData();
+                    formData.append('file', this.file);
+                    formData.append('submittal_type', this.submittalType);
+                    formData.append('enable_vision', this.enableVision);
+                    if (this.additionalContext) {
+                        formData.append('additional_context', this.additionalContext);
+                    }
+
+                    try {
+                        const response = await fetch('/api/review', {
+                            method: 'POST',
+                            body: formData,
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.result = data;
+                        } else {
+                            this.error = data.error || 'Review failed';
+                        }
+                    } catch (e) {
+                        this.error = 'Network error: ' + e.message;
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                formatDecision(decision) {
+                    if (!decision) return '';
+                    return decision.replace(/_/g, ' ');
+                },
+
+                getDecisionColor(decision) {
+                    const colors = {
+                        'approved': 'bg-green-500',
+                        'approved_as_noted': 'bg-yellow-500',
+                        'revise_and_resubmit': 'bg-orange-500',
+                        'rejected': 'bg-red-500',
+                    };
+                    return colors[decision] || 'bg-gray-500';
+                },
+
+                getStatusIcon(status) {
+                    const icons = {
+                        'pass': '<svg class="h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+                        'fail': '<svg class="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>',
+                        'partial': '<svg class="h-5 w-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>',
+                        'not_applicable': '<svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>',
+                    };
+                    return icons[status] || icons['not_applicable'];
+                },
+
+                getStatusBadgeColor(status) {
+                    const colors = {
+                        'pass': 'bg-green-100 text-green-800',
+                        'fail': 'bg-red-100 text-red-800',
+                        'partial': 'bg-yellow-100 text-yellow-800',
+                        'not_applicable': 'bg-gray-100 text-gray-800',
+                    };
+                    return colors[status] || colors['not_applicable'];
+                },
+            };
+        }
+    </script>
+</body>
+</html>
