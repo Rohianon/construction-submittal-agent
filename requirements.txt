@@ -51,6 +51,7 @@ certifi==2026.1.4
     #   httpx
     #   kubernetes
     #   llama-cloud
+    #   pinecone
     #   requests
 charset-normalizer==3.4.4
     # via requests
@@ -277,21 +278,30 @@ opentelemetry-sdk==1.39.1
 opentelemetry-semantic-conventions==0.60b1
     # via opentelemetry-sdk
 orjson==3.11.5
-    # via chromadb
+    # via
+    #   chromadb
+    #   pinecone
 overrides==7.7.0
     # via chromadb
-packaging==26.0
+packaging==24.2
     # via
     #   build
     #   huggingface-hub
     #   marshmallow
     #   onnxruntime
+    #   pinecone-plugin-assistant
 pandas==2.3.3
     # via llama-index-readers-file
 pillow==12.1.0
     # via
     #   construction-submittal-agent (pyproject.toml)
     #   llama-index-core
+pinecone==8.0.0
+    # via construction-submittal-agent (pyproject.toml)
+pinecone-plugin-assistant==3.0.1
+    # via pinecone
+pinecone-plugin-interface==0.0.7
+    # via pinecone
 platformdirs==4.5.1
     # via
     #   banks
@@ -346,6 +356,7 @@ python-dateutil==2.9.0.post0
     #   botocore
     #   kubernetes
     #   pandas
+    #   pinecone
     #   posthog
 python-dotenv==1.2.1
     # via
@@ -376,6 +387,7 @@ requests==2.32.5
     #   google-auth
     #   kubernetes
     #   llama-index-core
+    #   pinecone-plugin-assistant
     #   posthog
     #   requests-oauthlib
     #   tiktoken
@@ -455,6 +467,7 @@ typing-extensions==4.15.0
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
+    #   pinecone
     #   pydantic
     #   pydantic-core
     #   sqlalchemy
@@ -474,6 +487,7 @@ urllib3==2.6.3
     # via
     #   botocore
     #   kubernetes
+    #   pinecone
     #   requests
 uvicorn==0.40.0
     # via

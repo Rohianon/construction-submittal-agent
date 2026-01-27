@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: construction-submittal-agent
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: PINECONE_INDEX_NAME
+        value: construction-specs
+      - key: VECTOR_STORE_BACKEND
+        value: pinecone
+      - key: ENVIRONMENT
+        value: production

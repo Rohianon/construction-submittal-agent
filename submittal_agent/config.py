@@ -16,9 +16,13 @@ CHROMA_PERSIST_DIR = Path(os.getenv("CHROMA_PERSIST_DIR", str(BASE_DIR / "chroma
 # API Keys
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
 # Environment
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+# Vector Store Backend (pinecone or chroma)
+VECTOR_STORE_BACKEND = os.getenv("VECTOR_STORE_BACKEND", "chroma")
 IS_PRODUCTION = ENVIRONMENT == "production"
 
 # LLM Configuration
@@ -72,13 +76,23 @@ class ChunkingConfig:
     ]
 
 
+# Pinecone Configuration
+class PineconeConfig:
+    """Pinecone vector database configuration."""
+
+    INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "construction-specs")
+    NAMESPACE = "qcs-2024"
+    DIMENSION = 1536  # text-embedding-3-small dimensions
+    METRIC = "cosine"
+
+
 # Retrieval Configuration
 class RetrievalConfig:
     """Retrieval configuration."""
-    
+
     TOP_K = 8
     RELEVANCE_THRESHOLD = 0.3
-    
+
     # Collection name in ChromaDB
     COLLECTION_NAME = "construction_specs"
 

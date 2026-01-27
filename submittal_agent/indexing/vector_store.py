@@ -301,7 +301,7 @@ class ConstructionVectorStore:
 
 def init_knowledge_base(
     strategy: ParsingStrategy = ParsingStrategy.SENTENCE,
-    force_reindex: bool = False,
+    force_reindex: bool = True,
 ) -> dict:
     """
     Initialize the knowledge base from the data directory.

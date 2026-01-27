@@ -1,28 +1,51 @@
 """Retrieval module for fetching relevant specifications."""
 
 import logging
-from typing import Optional
+from typing import Optional, Protocol
 
-from submittal_agent.indexing.vector_store import (
-    get_vector_store,
-    ConstructionVectorStore,
-    ParsingStrategy,
-)
-from submittal_agent.config import RetrievalConfig
+from submittal_agent.config import RetrievalConfig, VECTOR_STORE_BACKEND
 
 logger = logging.getLogger(__name__)
+
+
+class VectorStoreProtocol(Protocol):
+    """Protocol for vector store implementations."""
+
+    def query(self, query_text: str, top_k: int) -> list[dict]:
+        """Query the vector store."""
+        ...
+
+
+def get_vector_store() -> VectorStoreProtocol:
+    """
+    Get the appropriate vector store based on configuration.
+
+    Uses VECTOR_STORE_BACKEND env var:
+      - "pinecone" -> PineconeVectorStore (for production/Render)
+      - "chroma" -> ConstructionVectorStore (for local development)
+    """
+    if VECTOR_STORE_BACKEND == "pinecone":
+        from submittal_agent.indexing.pinecone_store import get_pinecone_store
+        logger.info("Using Pinecone vector store (production)")
+        return get_pinecone_store()
+    else:
+        from submittal_agent.indexing.vector_store import (
+            get_vector_store as get_chroma_store,
+        )
+        logger.info("Using ChromaDB vector store (local)")
+        return get_chroma_store()
 
 
 class SpecificationRetriever:
     """
     Retrieves relevant specification chunks for submittal review.
 
-    Uses the vector store with configurable retrieval parameters.
+    Uses the configured vector store (Pinecone or ChromaDB).
     """
 
     def __init__(
         self,
-        vector_store: Optional[ConstructionVectorStore] = None,
+        vector_store: Optional[VectorStoreProtocol] = None,
         top_k: int = RetrievalConfig.TOP_K,
         relevance_threshold: float = RetrievalConfig.RELEVANCE_THRESHOLD,
     ):
