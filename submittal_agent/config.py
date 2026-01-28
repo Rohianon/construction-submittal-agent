@@ -28,19 +28,19 @@ IS_PRODUCTION = ENVIRONMENT == "production"
 # LLM Configuration
 class LLMConfig:
     """LLM model configuration with fallback support."""
-    
-    # Primary LLM (Claude)
+
+    # Primary LLM (Claude Opus 4.5 - latest)
     PRIMARY_PROVIDER = "anthropic"
-    PRIMARY_MODEL = "claude-sonnet-4-20250514"
+    PRIMARY_MODEL = "claude-opus-4-5-20251101"
     PRIMARY_MAX_TOKENS = 4096
-    
-    # Fallback LLM (GPT-4)
+
+    # Fallback LLM (GPT-5.2 - latest for coding/agentic)
     FALLBACK_PROVIDER = "openai"
-    FALLBACK_MODEL = "gpt-4-turbo"
+    FALLBACK_MODEL = "gpt-5.2"
     FALLBACK_MAX_TOKENS = 4096
-    
-    # Vision model (Claude)
-    VISION_MODEL = "claude-sonnet-4-20250514"
+
+    # Vision model (Claude Opus 4.5)
+    VISION_MODEL = "claude-opus-4-5-20251101"
     VISION_MAX_TOKENS = 2048
     
     # Temperature for deterministic outputs

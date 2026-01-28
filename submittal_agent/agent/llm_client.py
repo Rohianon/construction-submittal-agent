@@ -20,8 +20,8 @@ class LLMClient:
     """
     Unified LLM client with automatic fallback.
 
-    Primary: Claude (claude-sonnet-4-20250514)
-    Fallback: GPT-4-turbo
+    Primary: Claude Opus 4.5 (claude-opus-4-5-20251101)
+    Fallback: GPT-5.2
 
     Supports both text and vision (multimodal) requests.
     """
@@ -43,6 +43,7 @@ class LLMClient:
         max_tokens: int = LLMConfig.PRIMARY_MAX_TOKENS,
         temperature: float = LLMConfig.TEMPERATURE,
         json_mode: bool = False,
+        model: str = "auto",
     ) -> tuple[str, str]:
         """
         Complete a text request with automatic fallback.
@@ -53,11 +54,46 @@ class LLMClient:
             max_tokens: Maximum tokens to generate
             temperature: Sampling temperature
             json_mode: If True, request JSON output
+            model: Model selection - "auto", "claude", or "gpt-4"
 
         Returns:
             Tuple of (response_text, provider_used)
         """
-        # Try Claude first
+        # Handle explicit model selection
+        if model == "gpt-5":
+            if self.openai:
+                try:
+                    response = self._call_openai(
+                        messages=messages,
+                        system=system,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        json_mode=json_mode,
+                    )
+                    self._last_provider = "gpt-5.2"
+                    return response, "gpt-5.2"
+                except Exception as e:
+                    logger.error(f"GPT-5.2 failed: {e}")
+                    raise
+            raise ValueError("GPT-5.2 selected but OPENAI_API_KEY not set.")
+
+        if model == "claude":
+            if self.claude:
+                try:
+                    response = self._call_claude(
+                        messages=messages,
+                        system=system,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                    )
+                    self._last_provider = "claude"
+                    return response, "claude"
+                except Exception as e:
+                    logger.error(f"Claude failed: {e}")
+                    raise
+            raise ValueError("Claude selected but ANTHROPIC_API_KEY not set.")
+
+        # Auto mode: Try Claude first with GPT-4 fallback
         if self.claude:
             try:
                 response = self._call_claude(
@@ -71,7 +107,7 @@ class LLMClient:
             except (RateLimitError, APIError) as e:
                 logger.warning(f"Claude failed: {e}, falling back to GPT-4")
 
-        # Fallback to GPT-4
+        # Fallback to GPT-5.2
         if self.openai:
             try:
                 response = self._call_openai(
@@ -81,10 +117,10 @@ class LLMClient:
                     temperature=temperature,
                     json_mode=json_mode,
                 )
-                self._last_provider = "gpt-4"
-                return response, "gpt-4"
+                self._last_provider = "gpt-5.2"
+                return response, "gpt-5.2"
             except Exception as e:
-                logger.error(f"GPT-4 also failed: {e}")
+                logger.error(f"GPT-5.2 also failed: {e}")
                 raise
 
         raise ValueError("No LLM provider available. Check API keys.")
@@ -120,9 +156,9 @@ class LLMClient:
                 self._last_provider = "claude-vision"
                 return response, "claude-vision"
             except (RateLimitError, APIError) as e:
-                logger.warning(f"Claude Vision failed: {e}, falling back to GPT-4 Vision")
+                logger.warning(f"Claude Vision failed: {e}, falling back to GPT-5.2 Vision")
 
-        # Fallback to GPT-4 Vision
+        # Fallback to GPT-5.2 Vision
         if self.openai:
             try:
                 response = self._call_openai_vision(
@@ -131,10 +167,10 @@ class LLMClient:
                     system=system,
                     max_tokens=max_tokens,
                 )
-                self._last_provider = "gpt-4-vision"
-                return response, "gpt-4-vision"
+                self._last_provider = "gpt-5.2-vision"
+                return response, "gpt-5.2-vision"
             except Exception as e:
-                logger.error(f"GPT-4 Vision also failed: {e}")
+                logger.error(f"GPT-5.2 Vision also failed: {e}")
                 raise
 
         raise ValueError("No vision-capable LLM available. Check API keys.")
@@ -235,7 +271,7 @@ class LLMClient:
         messages.append({"role": "user", "content": content})
 
         response = self.openai.chat.completions.create(
-            model="gpt-4-turbo",
+            model=LLMConfig.FALLBACK_MODEL,
             messages=messages,
             max_tokens=max_tokens,
         )

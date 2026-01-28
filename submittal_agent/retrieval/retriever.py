@@ -57,6 +57,7 @@ class SpecificationRetriever:
         self,
         query: str,
         submittal_type: Optional[str] = None,
+        top_k: Optional[int] = None,
     ) -> list[dict]:
         """
         Retrieve relevant specification chunks.
@@ -64,10 +65,14 @@ class SpecificationRetriever:
         Args:
             query: Search query (typically submittal content summary)
             submittal_type: Type of submittal for filtering
+            top_k: Number of chunks to retrieve (overrides instance default)
 
         Returns:
             List of relevant chunks with metadata
         """
+        # Use provided top_k or fall back to instance default
+        k = top_k if top_k is not None else self.top_k
+
         # Build enhanced query
         enhanced_query = query
         if submittal_type:
@@ -76,7 +81,7 @@ class SpecificationRetriever:
         # Query vector store
         results = self.vector_store.query(
             query_text=enhanced_query,
-            top_k=self.top_k * 2,  # Over-fetch for filtering
+            top_k=k * 2,  # Over-fetch for filtering
         )
 
         # Filter by relevance threshold
@@ -86,7 +91,7 @@ class SpecificationRetriever:
         ]
 
         # Return top_k after filtering
-        return filtered[:self.top_k]
+        return filtered[:k]
 
     def build_context(self, chunks: list[dict]) -> str:
         """Build context string from retrieved chunks."""

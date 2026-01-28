@@ -60,6 +60,10 @@ class SubmittalReviewAgent:
         submittal_type: str = "product_data",
         enable_vision: bool = True,
         additional_context: str = "",
+        model: str = "auto",
+        temperature: float = 0.0,
+        max_tokens: int = 4096,
+        top_k: int = 8,
     ) -> ReviewDecision:
         """
         Perform a complete submittal review.
@@ -70,6 +74,10 @@ class SubmittalReviewAgent:
             submittal_type: Type of submittal (product_data, shop_drawing, etc.)
             enable_vision: Whether to analyze images/drawings
             additional_context: Additional context from user
+            model: LLM model to use (auto, claude, gpt-4)
+            temperature: Temperature for LLM generation
+            max_tokens: Maximum response tokens
+            top_k: Number of specification chunks to retrieve
 
         Returns:
             ReviewDecision with complete review results
@@ -91,13 +99,13 @@ class SubmittalReviewAgent:
                 drawing_analysis = self.vision.analyze(images)
 
         # Step 3: Retrieve relevant specifications
-        logger.info("Retrieving relevant specifications")
+        logger.info(f"Retrieving relevant specifications (top_k={top_k})")
         query = self._build_retrieval_query(submittal_text, submittal_type)
-        retrieved_chunks = self.retriever.retrieve(query, submittal_type)
+        retrieved_chunks = self.retriever.retrieve(query, submittal_type, top_k=top_k)
         spec_context = build_spec_context(retrieved_chunks)
 
         # Step 4: Generate review decision
-        logger.info("Generating review decision")
+        logger.info(f"Generating review decision (model={model}, temp={temperature})")
         review_prompt = build_review_prompt(
             submittal_content=submittal_text,
             submittal_type=submittal_type,
@@ -108,6 +116,9 @@ class SubmittalReviewAgent:
         response, provider = self.llm.complete(
             messages=[{"role": "user", "content": review_prompt}],
             system=REVIEW_SYSTEM_PROMPT,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
 
         # Step 5: Parse and validate response

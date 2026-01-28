@@ -22,6 +22,10 @@ async def review_submittal(
     submittal_type: str = Form(default="product_data", description="Type of submittal"),
     enable_vision: bool = Form(default=True, description="Enable vision analysis"),
     additional_context: Optional[str] = Form(default=None, description="Additional context"),
+    model: str = Form(default="auto", description="LLM model: auto, claude, or gpt-4"),
+    temperature: float = Form(default=0.0, description="Temperature for LLM"),
+    max_tokens: int = Form(default=4096, description="Max response tokens"),
+    top_k: int = Form(default=8, description="Number of specification chunks to retrieve"),
 ):
     """
     Review a construction submittal and return approval decision.
@@ -57,6 +61,10 @@ async def review_submittal(
             submittal_type=submittal_type,
             enable_vision=enable_vision,
             additional_context=additional_context or "",
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_k=top_k,
         )
 
         elapsed_ms = (time.time() - start_time) * 1000
