@@ -238,7 +238,7 @@ class LLMClient:
         kwargs = {
             "model": LLMConfig.FALLBACK_MODEL,
             "messages": formatted_messages,
-            "max_tokens": max_tokens,
+            "max_completion_tokens": max_tokens,  # GPT-5.x uses max_completion_tokens
             "temperature": temperature,
         }
         if json_mode:
@@ -273,7 +273,7 @@ class LLMClient:
         response = self.openai.chat.completions.create(
             model=LLMConfig.FALLBACK_MODEL,
             messages=messages,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_tokens,  # GPT-5.x uses max_completion_tokens
         )
         return response.choices[0].message.content
 
