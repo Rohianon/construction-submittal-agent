@@ -53,6 +53,16 @@ class DrawingAnalysis(BaseModel):
     notes: str = Field(default="", description="General notes about the drawings")
 
 
+class ReasoningStep(BaseModel):
+    """A single step in the agent's reasoning process."""
+    step: int = Field(description="Step number (1-5)")
+    title: str = Field(description="Short title for the step")
+    status: str = Field(description="Status: pending, in_progress, completed, skipped, failed")
+    description: str = Field(description="What's happening in this step")
+    duration_ms: Optional[float] = Field(default=None, description="Time taken for this step")
+    details: Optional[dict] = Field(default=None, description="Step-specific details")
+
+
 class ReviewDecision(BaseModel):
     """Complete submittal review decision - the main output schema."""
 
@@ -133,3 +143,7 @@ class ReviewResponse(BaseModel):
     data: Optional[ReviewDecision] = None
     error: Optional[str] = None
     processing_time_ms: Optional[float] = None
+    reasoning_steps: list[ReasoningStep] = Field(
+        default_factory=list,
+        description="Steps the agent took during reasoning"
+    )

@@ -55,7 +55,7 @@ async def review_submittal(
 
         # Get review agent and process
         agent = get_review_agent()
-        decision = agent.review(
+        decision, reasoning_steps = agent.review(
             pdf_content=content,
             filename=file.filename,
             submittal_type=submittal_type,
@@ -73,6 +73,7 @@ async def review_submittal(
             success=True,
             data=decision,
             processing_time_ms=elapsed_ms,
+            reasoning_steps=reasoning_steps,
         )
 
     except HTTPException:

@@ -24,6 +24,7 @@ from submittal_agent.schemas.review_response import (
     Citation,
     DetailedComment,
     DrawingAnalysis,
+    ReasoningStep,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,7 @@ class SubmittalReviewAgent:
         temperature: float = 0.0,
         max_tokens: int = 4096,
         top_k: int = 8,
-    ) -> ReviewDecision:
+    ) -> tuple[ReviewDecision, list[ReasoningStep]]:
         """
         Perform a complete submittal review.
 
@@ -74,22 +75,33 @@ class SubmittalReviewAgent:
             submittal_type: Type of submittal (product_data, shop_drawing, etc.)
             enable_vision: Whether to analyze images/drawings
             additional_context: Additional context from user
-            model: LLM model to use (auto, claude, gpt-4)
+            model: LLM model to use (auto, claude, gpt-5)
             temperature: Temperature for LLM generation
             max_tokens: Maximum response tokens
             top_k: Number of specification chunks to retrieve
 
         Returns:
-            ReviewDecision with complete review results
+            Tuple of (ReviewDecision, list of ReasoningSteps)
         """
         start_time = time.time()
+        reasoning_steps: list[ReasoningStep] = []
 
         # Step 1: Parse PDF for text
+        step1_start = time.time()
         logger.info(f"Parsing PDF: {filename}")
         parsed_doc = self.pdf_parser.parse_bytes(pdf_content, filename)
         submittal_text = parsed_doc.get_full_text()
+        reasoning_steps.append(ReasoningStep(
+            step=1,
+            title="Parsing Document",
+            status="completed",
+            description=f"Extracted text from {filename}",
+            duration_ms=(time.time() - step1_start) * 1000,
+            details={"pages": len(parsed_doc.pages), "characters": len(submittal_text)},
+        ))
 
         # Step 2: Extract and analyze images (if enabled)
+        step2_start = time.time()
         drawing_analysis = None
         if enable_vision:
             logger.info("Extracting images for vision analysis")
@@ -97,14 +109,48 @@ class SubmittalReviewAgent:
             if images.images:
                 logger.info(f"Analyzing {len(images.images)} images")
                 drawing_analysis = self.vision.analyze(images)
+                reasoning_steps.append(ReasoningStep(
+                    step=2,
+                    title="Analyzing Images",
+                    status="completed",
+                    description=f"Processed {len(images.images)} diagrams with vision AI",
+                    duration_ms=(time.time() - step2_start) * 1000,
+                    details={"images_analyzed": len(images.images)},
+                ))
+            else:
+                reasoning_steps.append(ReasoningStep(
+                    step=2,
+                    title="Analyzing Images",
+                    status="skipped",
+                    description="No images found in document",
+                    duration_ms=(time.time() - step2_start) * 1000,
+                ))
+        else:
+            reasoning_steps.append(ReasoningStep(
+                step=2,
+                title="Analyzing Images",
+                status="skipped",
+                description="Vision analysis disabled",
+                duration_ms=0,
+            ))
 
         # Step 3: Retrieve relevant specifications
+        step3_start = time.time()
         logger.info(f"Retrieving relevant specifications (top_k={top_k})")
         query = self._build_retrieval_query(submittal_text, submittal_type)
         retrieved_chunks = self.retriever.retrieve(query, submittal_type, top_k=top_k)
         spec_context = build_spec_context(retrieved_chunks)
+        reasoning_steps.append(ReasoningStep(
+            step=3,
+            title="Retrieving Specifications",
+            status="completed",
+            description=f"Found {len(retrieved_chunks)} relevant QCS 2024 sections",
+            duration_ms=(time.time() - step3_start) * 1000,
+            details={"chunks_retrieved": len(retrieved_chunks), "top_k": top_k},
+        ))
 
         # Step 4: Generate review decision
+        step4_start = time.time()
         logger.info(f"Generating review decision (model={model}, temp={temperature})")
         review_prompt = build_review_prompt(
             submittal_content=submittal_text,
@@ -120,8 +166,17 @@ class SubmittalReviewAgent:
             temperature=temperature,
             max_tokens=max_tokens,
         )
+        reasoning_steps.append(ReasoningStep(
+            step=4,
+            title="Generating Review",
+            status="completed",
+            description=f"Evaluated compliance using {provider}",
+            duration_ms=(time.time() - step4_start) * 1000,
+            details={"model": provider, "temperature": temperature},
+        ))
 
         # Step 5: Parse and validate response
+        step5_start = time.time()
         decision = self._parse_review_response(response, provider, submittal_type)
 
         # Add drawing analysis if available
@@ -130,11 +185,19 @@ class SubmittalReviewAgent:
 
         # Validate and enhance citations
         decision.citations = self._validate_citations(decision.citations, retrieved_chunks)
+        reasoning_steps.append(ReasoningStep(
+            step=5,
+            title="Validating Response",
+            status="completed",
+            description=f"Verified {len(decision.citations)} citations",
+            duration_ms=(time.time() - step5_start) * 1000,
+            details={"citations_validated": len(decision.citations)},
+        ))
 
         elapsed = time.time() - start_time
         logger.info(f"Review completed in {elapsed:.2f}s using {provider}")
 
-        return decision
+        return decision, reasoning_steps
 
     def _build_retrieval_query(self, text: str, submittal_type: str) -> str:
         """Build a focused query for specification retrieval."""
