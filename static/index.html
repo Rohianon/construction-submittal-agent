@@ -664,7 +664,7 @@
                                         </div>
                                         <span x-show="citation.section" class="text-xs text-slate-500 bg-deep-700 px-2 py-1 rounded" x-text="'Section ' + citation.section"></span>
                                     </div>
-                                    <p class="text-sm text-slate-400 italic leading-relaxed" x-text="'\"' + (citation.quote || '').substring(0, 250) + (citation.quote?.length > 250 ? '...' : '') + '\"'"></p>
+                                    <p class="text-sm text-slate-400 italic leading-relaxed" x-text="formatQuote(citation.quote)"></p>
                                 </div>
                             </template>
                         </div>
@@ -930,6 +930,12 @@
                     } finally {
                         this.loading = false;
                     }
+                },
+
+                formatQuote(quote) {
+                    if (!quote) return '""';
+                    const truncated = quote.length > 250 ? quote.substring(0, 250) + '...' : quote;
+                    return '"' + truncated + '"';
                 },
 
                 formatDecision(decision) {
